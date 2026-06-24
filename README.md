@@ -1,0 +1,137 @@
+# QA Pilot — Jira Test Generator Agent
+
+## Overview
+A multi-agent AI system that reads Jira user stories and automatically generates structured Cucumber test plans written back to Jira as Xray Test issues. Built with Google ADK and Antigravity for the **Kaggle AI Agents Vibe Coding Capstone Project**.
+
+## Problem Statement
+QA engineers spend **30-40% of their time** writing test cases manually. QA Pilot automates this entirely — from reading a Jira ticket to generating BDD Gherkin scenarios and boundary edge cases, writing them back as structured, linked Xray Test issues directly into the Jira Xray repository.
+
+## Architecture
+QA Pilot utilizes a coordinated multi-agent team and modular structure:
+- **Orchestrator Agent:** Coordinates the flow. Fetches the Jira ticket using the Atlassian MCP server, forwards details to sub-agents, parses outputs, creates linked Test tickets, and manages Xray GraphQL uploads.
+- **BDD Agent:** Analyzes ticket parameters to generate structured Gherkin `Given` / `When` / `Then` Cucumber scenarios covering happy-path flows.
+- **Edge Case Agent:** Evaluates parameters to discover negative paths, boundaries, and validation scenarios returned in structured markdown table format.
+- **create_jira_ticket skill:** Synthesizes and creates beautifully formatted Jira User Story issues with detailed ADF (Atlassian Document Format) Scope of Work and Acceptance Criteria.
+- **Guardrails module:** Provides robust runtime sanitization and security enforcement: validates ticket IDs against spoofs, detects prompt injection payloads in feature inputs, checks Jira response schemas, and redacts exposed credentials or workspace directories from final reports.
+- **Streamlit App:** Provides a modern, premium web interface to trigger agent workflows and view test creation pipelines in real-time.
+
+## Tech Stack
+- **Python** (Core application logic)
+- **Google ADK** (Agent development kit framework)
+- **Antigravity CLI/IDE** (Vibe coding orchestrator)
+- **Atlassian MCP Server** (Standardized model-context protocol integration with Jira)
+- **Xray Cloud API** (Authentication REST and GraphQL mutations)
+- **Streamlit** (Web dashboard interface)
+- **python-dotenv** (Environment configuration)
+
+## Setup Instructions
+
+### Prerequisites
+- Python 3.11+
+- `uv` package manager (`pip install uv`)
+- Antigravity CLI installed
+- Jira Cloud account (with administrator settings)
+- Xray Cloud app installed in your Jira project
+
+### Installation
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/username/qa-pilot.git
+   cd qa-pilot
+   ```
+2. **Install dependencies using uv:**
+   ```bash
+   uv venv
+   source .venv/bin/activate
+   uv pip install -r requirements.txt
+   ```
+3. **Configure Environment Variables:**
+   Copy the example environment file and fill in your details:
+   ```bash
+   cp .env.example .env
+   ```
+   *(See details on environment variables below)*
+
+4. **Configure Atlassian MCP Server:**
+   Ensure the Jira MCP server config aligns with your Python virtual environment path in `agent/orchestrator.py` and `agent/skills/create_jira_ticket.py`.
+
+5. **Run the Streamlit app:**
+   ```bash
+   streamlit run app.py
+   ```
+
+### Environment Variables
+Below are the parameters expected in your `.env` configuration file:
+```env
+# Google Gemini API credential token
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Atlassian Jira site domain (e.g., https://name.atlassian.net)
+ATLASSIAN_SITE_URL=https://yourname.atlassian.net
+
+# Atlassian user email account
+ATLASSIAN_USER_EMAIL=your@email.com
+
+# Atlassian API Token generated from Account Settings -> Security
+ATLASSIAN_API_TOKEN=your_jira_api_token_here
+
+# Default Jira Project Key (e.g., SCRUM)
+JIRA_PROJECT_KEY=your_project_key
+
+# Xray API Keys generated from Jira Settings -> Apps -> Xray API Keys
+XRAY_CLIENT_ID=your_xray_client_id_here
+XRAY_CLIENT_SECRET=your_xray_client_secret_here
+
+# Selected Gemini LLM model (defaults to gemini-2.5-flash)
+GEMINI_MODEL=gemini-3.1-flash-lite
+```
+
+### Running the App
+Start the dashboard server:
+```bash
+streamlit run app.py
+```
+Access the application dashboard at [http://localhost:8501](http://localhost:8501).
+
+
+## Agent Concepts Demonstrated
+- [x] **Multi-agent system** (ADK orchestrator + sub-agents)
+- [x] **MCP Server** (Atlassian Jira integration)
+- [x] **Antigravity CLI/IDE** (vibe coding workflow)
+- [x] **Security guardrails** (input validation, prompt injection protection, token redaction)
+- [x] **Agent Skills** (create_jira_ticket skill)
+
+## Project Structure
+```
+qa-pilot/
+├── README.md
+├── requirements.txt
+├── app.py                     # Streamlit frontend UI
+├── .env                       # Local credentials config
+├── agent/
+│   ├── __init__.py
+│   ├── guardrails.py          # Security guardrail checks & sanitizers
+│   ├── orchestrator.py        # Coordinated multi-agent orchestrator
+│   ├── bdd_agent.py           # BDD Cucumber sub-agent
+│   ├── edge_case_agent.py     # Boundary edge case sub-agent
+│   ├── prompts/
+│   │   ├── bdd_prompt.txt
+│   │   └── edge_case_prompt.txt
+│   └── skills/
+│       └── create_jira_ticket.py # Story creation skill
+├── mcp/
+│   └── jira_mcp_server.py     # Atlassian MCP tool endpoints
+├── tests/
+│   └── sample_tickets/
+│       └── sample_ticket.json # Offline test mockups
+└── reports/                   # Saved QA analysis files
+```
+
+## Demo
+[YouTube demo link coming soon]
+
+## Track
+Agents for Business
+
+## Author
+Irina Aksionkina

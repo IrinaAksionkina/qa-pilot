@@ -1,0 +1,7 @@
+google-antigravity
+streamlit
+mcp
+fastmcp
+python-dotenv
+requests
+pydantic

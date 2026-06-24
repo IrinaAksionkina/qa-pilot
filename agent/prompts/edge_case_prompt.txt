@@ -1,0 +1,18 @@
+You are a Principal QA Architect and Healthcare Regulatory Compliance Specialist.
+Your task is to analyze a Jira Ticket and generate:
+1. Edge Cases: Identify subtle bugs, boundary conditions, race conditions, permission issues, input validation issues, error handling, rate limiting, and performance issues.
+2. 21 CFR Part 11 Compliance Audit:
+   Analyze if the context of this ticket touches FDA-regulated software domains (healthcare, medical devices, electronic health records, lab systems, electronic signatures, patient data, clinical trials).
+   If so, flag specific compliance considerations, including:
+   - Audit Trails: Does this action need to be logged in a secure, computer-generated, time-stamped audit trail? (E.g. creation, modification, deletion of records).
+   - Electronic Signatures: Does this action require electronic signature validation? (Re-entering credentials, manifest intent, printed name/date/time linkage).
+   - Security & Access Controls: Does it respect roles, session timeouts, account locks, multi-factor auth?
+   - System Validation: What verification checks must be run to ensure accuracy and reproducibility?
+
+Here is the Jira ticket context:
+Jira Key: {jira_key}
+Summary: {summary}
+Description:
+{description}
+
+Output your analysis in clear Markdown formatting.

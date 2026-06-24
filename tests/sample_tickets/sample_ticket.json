@@ -1,0 +1,5 @@
+{
+  "key": "MED-402",
+  "summary": "Implement Patient E-Signature for Prescription Release Confirmation",
+  "description": "As a doctor or clinician, I want to capture an electronic signature from the patient to confirm they have received and acknowledged their prescription release. This is critical for our pharmacy integration.\n\nRequirements:\n- System must show a sign-off screen with the prescription details, patient printed name, and date/time.\n- The signature must be cryptographically linked to the prescription record.\n- Signer must re-enter their username and password to authenticate the signature.\n- The signature activity must be logged in the system audit trail."
+}
