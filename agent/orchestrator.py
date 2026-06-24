@@ -306,6 +306,53 @@ class QAOrchestrator:
             # Fallback string parsing if direct REST API ADF parsing failed
             if not user_story_narrative or not ac_list_content:
                 if desc_text:
+                    # Attempt to parse as JSON ADF in case description was returned/passed as a raw JSON string
+                    json_desc = None
+                    if desc_text.strip().startswith("{") and desc_text.strip().endswith("}"):
+                        try:
+                            import json
+                            json_desc = json.loads(desc_text)
+                        except Exception:
+                            pass
+                    
+                    if json_desc and isinstance(json_desc, dict) and json_desc.get("type") == "doc":
+                        content_nodes = json_desc.get("content", [])
+                        current_section = None
+                        parsed_story = []
+                        parsed_ac = []
+                        for node in content_nodes:
+                            node_type = node.get("type")
+                            if node_type == "heading":
+                                heading_text = "".join([t.get("text", "") for t in node.get("content", []) if t.get("type") == "text"]).strip().lower()
+                                if "story description" in heading_text or "description" in heading_text:
+                                    current_section = "story"
+                                elif "acceptance criteria" in heading_text:
+                                    current_section = "ac"
+                                else:
+                                    current_section = None
+                            elif node_type == "paragraph" and current_section == "story":
+                                text_val = "".join([t.get("text", "") for t in node.get("content", []) if t.get("type") == "text"]).strip()
+                                if text_val:
+                                    parsed_story.append(text_val)
+                            elif node_type == "orderedList" and current_section == "ac":
+                                idx = 1
+                                for list_item in node.get("content", []):
+                                    item_texts = []
+                                    for paragraph in list_item.get("content", []):
+                                        for text_node in paragraph.get("content", []):
+                                            if text_node.get("type") == "text":
+                                                text_txt = text_node.get("text", "").strip()
+                                                if text_txt:
+                                                    item_texts.append(text_txt)
+                                    if item_texts:
+                                        combined_text = " ".join(item_texts).replace("\n", " ").strip()
+                                        parsed_ac.append(f"{idx}. {combined_text}")
+                                        idx += 1
+                        if parsed_story:
+                            user_story_narrative = "\n".join(parsed_story)
+                        if parsed_ac:
+                            ac_list_content = "\n".join(parsed_ac)
+                    
                     if not user_story_narrative:
                         story_match = re.search(r"As a.*?(?=\n\n|\n[A-Z]|\Z)", desc_text, re.DOTALL | re.IGNORECASE)
                         if story_match:

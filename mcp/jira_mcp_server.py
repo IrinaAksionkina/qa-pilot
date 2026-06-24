@@ -20,7 +20,7 @@ def get_issue(issue_key: str) -> str:
     """
     Fetches the details (summary, description, etc.) of a Jira issue by its key.
     """
-    url = f"{SITE_URL.rstrip('/')}/rest/api/2/issue/{issue_key}"
+    url = f"{SITE_URL.rstrip('/')}/rest/api/3/issue/{issue_key}"
     res = requests.get(url, auth=(EMAIL, API_TOKEN), headers={"Accept": "application/json"})
     if res.status_code != 200:
         return f"Error: Failed to fetch issue {issue_key}. Status: {res.status_code}. Response: {res.text}"
