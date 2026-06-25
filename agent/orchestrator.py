@@ -261,6 +261,7 @@ class QAOrchestrator:
                 match = re.search(pattern, ticket_details, re.IGNORECASE)
                 if match:
                     summary = match.group(1).strip()
+                    summary = re.sub(r'\*+', '', summary).strip()
                     break
 
             if not summary:
