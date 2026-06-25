@@ -57,7 +57,7 @@ async def create_jira_ticket(feature_name: str) -> str:
         "   - Bullet List (bulletList) containing 3 to 5 plain-text listItem nodes\n"
         "   - Heading 2 with text 'Acceptance Criteria'\n"
         "   - One Ordered List (orderedList) where each listItem contains a paragraph with the Scenario title only (having the strong mark applied), "
-        "and Gherkin steps as separate plain-text paragraphs (no bold, indent attribute set to 1).\n"
+        "and Gherkin steps as separate plain-text paragraphs (no bold, and do NOT use the indent attribute as it is unsupported in this context).\n"
         "4. Immediately invoke the `create_issue` tool on the `jira` server transport, passing the generated title as 'summary', the structured ADF JSON dictionary object as 'description', and 'Story' as 'issue_type'.\n"
         "5. On success, return exactly: 'Success: Created issue [ticket ID] with title: [Generated Title]'."
     )

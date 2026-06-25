@@ -49,9 +49,11 @@ def create_issue(summary: str, description: Any, issue_type: str = "Story", labe
     # If description is a plain string, convert it to a valid ADF representation
     if isinstance(description, str):
         import json
+        import re
         try:
             temp = description.strip()
-            # Attempt to recursively decode double-serialized or whitespace-padded JSON strings
+            # Clean common LLM formatting artifacts like trailing backslashes at end of lines
+            temp = re.sub(r'\\+\s*\n', '\n', temp)
             for _ in range(3):
                 parsed = json.loads(temp)
                 if isinstance(parsed, dict):

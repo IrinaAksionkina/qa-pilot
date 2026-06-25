@@ -30,8 +30,9 @@ class BDDAgent:
                 policy.allow("*")
             ],
             system_instructions=(
-                "You are an expert QA Engineer. Analyze the given Jira ticket details and generate Gherkin/BDD scenarios "
+                "You are an expert QA Engineer. Analyze the given Jira ticket details and generate 3 to 5 critical Gherkin/BDD scenarios "
                 "covering the happy path and main workflows. Use standard Given/When/Then formatting. "
+                "Keep each scenario concise, avoid repetitive steps, and do NOT loop or output duplicate scenarios. "
                 "Do NOT write any files or use any tools to edit files."
             )
         )

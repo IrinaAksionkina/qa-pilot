@@ -169,8 +169,19 @@ class QAOrchestrator:
             # Map columns to Step action and Expected Result
             # Columns usually are: Test Case | Steps | Expected Result
             if len(parts) >= 3:
-                action = f"{parts[0]} - {parts[1]}"
-                result = parts[2]
+                raw_steps = parts[1]
+                # Split on <br> tags into individual steps
+                individual_steps = re.split(r'<br\s*/?>', raw_steps)
+                for s in individual_steps:
+                    # Remove numbered prefixes and clean up
+                    s = re.sub(r'^\d+\.\s*', '', s.strip())
+                    s = re.sub(r'<[^>]+>', '', s).strip()
+                    if s:
+                        steps.append({
+                            "action": f"{parts[0]} - {s}",
+                            "result": parts[2]
+                        })
+                continue
             elif len(parts) == 2:
                 action = parts[0]
                 result = parts[1]
