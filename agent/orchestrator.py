@@ -502,7 +502,7 @@ class QAOrchestrator:
             await asyncio.sleep(2.0)  # Rate limit pacing delay
             # Link the manual test ticket to the story (inward: story, outward: test, so outward 'tests' inward story and inward is 'tested by' outward test)
             link_manual_resp = await agent.chat(
-                f"Link the issues using the link_issues tool: inward_key: '{ticket_id}', outward_key: '{manual_test_key}', link_type_name: 'is tested by'."
+                f"Link the issues using the link_issues tool: inward_key: '{ticket_id}', outward_key: '{manual_test_key}', link_type_name: 'Test'."
             )
             await link_manual_resp.text()
  
@@ -534,7 +534,7 @@ class QAOrchestrator:
             await asyncio.sleep(2.0)  # Rate limit pacing delay
             # Link the cucumber test ticket to the story
             link_cuc_resp = await agent.chat(
-                f"Link the issues using the link_issues tool: inward_key: '{ticket_id}', outward_key: '{cucumber_test_key}', link_type_name: 'is tested by'."
+                f"Link the issues using the link_issues tool: inward_key: '{ticket_id}', outward_key: '{cucumber_test_key}', link_type_name: 'Test'."
             )
             await link_cuc_resp.text()
 
