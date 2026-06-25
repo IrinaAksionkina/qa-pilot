@@ -249,8 +249,23 @@ class QAOrchestrator:
             ticket_details = await response.text()
             
             # Extract summary/title for naming the test tickets
-            summary_match = re.search(r"Summary:\s*(.*)", ticket_details)
-            summary = summary_match.group(1).strip() if summary_match else f"Feature {ticket_id}"
+            print(f"DEBUG ticket_details: {ticket_details[:500]}")
+            summary = None
+            patterns = [
+                r"Summary:\s*(.*)",
+                r"summary['\"]:\s*['\"]([^'\"]+)['\"]",
+                r"\"summary\":\s*\"([^\"]+)\"",
+                r"Title:\s*(.*)",
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, ticket_details, re.IGNORECASE)
+                if match:
+                    summary = match.group(1).strip()
+                    break
+
+            if not summary:
+                summary = f"Feature {ticket_id}"
+            print(f"DEBUG summary extracted: {summary}")
 
             # Security Guardrail Check 3: Validate schema structure of get_issue response content
             desc_match = re.search(r"Description:\s*(.*)", ticket_details, re.DOTALL)
