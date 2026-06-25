@@ -7,7 +7,9 @@ Role in Architecture: Orchestrates the multi-agent system workflow, links Jira i
 import os
 import re
 import requests
+import asyncio
 from google.antigravity import Agent, LocalAgentConfig, types
+from google.antigravity.hooks import policy
 from dotenv import load_dotenv
 
 # Import sub-agents
@@ -40,6 +42,12 @@ class QAOrchestrator:
             model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
             mcp_servers=self.mcp_servers,
             tools=[create_jira_ticket],
+            policies=[
+                policy.deny("create_file"),
+                policy.deny("edit_file"),
+                policy.deny("run_command"),
+                policy.allow("*")
+            ],
             system_instructions=(
                 "You are a master QA orchestrator. Your job is to fetch Jira ticket content using get_issue tool, "
                 "then process it. You also have tools to create and link tickets, and the create_jira_ticket tool. "
@@ -242,10 +250,15 @@ class QAOrchestrator:
                 raise ValueError(f"Security Validation Failure (Jira Data): {err_schema}")
 
             # 2. Call sub-agents to generate BDD scenarios and edge cases
+            await asyncio.sleep(2.0)  # Rate limit pacing delay
             bdd_scenarios = await self.bdd_agent.generate_bdd(ticket_details)
+            
+            await asyncio.sleep(2.0)  # Rate limit pacing delay
             edge_cases = await self.edge_case_agent.generate_edge_cases(ticket_details)
             
             # Clean User Story narrative and Acceptance Criteria lists parsed from description field
+            # ...
+            # [Lines 249 to 387 unchanged, showing context below]
             user_story_narrative = ""
             ac_list_content = ""
             
@@ -302,7 +315,7 @@ class QAOrchestrator:
                                     ac_list_content = "\n".join(ac_items)
             except Exception as parse_err:
                 print(f"ADF description parsing failed fallback: {parse_err}")
-
+ 
             # Fallback string parsing if direct REST API ADF parsing failed
             if not user_story_narrative or not ac_list_content:
                 if desc_text:
@@ -383,23 +396,82 @@ class QAOrchestrator:
                 user_story_narrative = f"As a user, I want to view the details for {ticket_id}."
             if not ac_list_content:
                 ac_list_content = "1. Verify functionality is working as described in the story."
-
+ 
             # Description shows source story context — test cases live in Xray fields only
-            test_description = (
-                f"h2. *User Story*\n"
-                f"{user_story_narrative}\n\n"
-                f"h2. *Acceptance Criteria*\n"
-                f"{ac_list_content}"
-            )
+            import json
+            ac_lines = [line.strip() for line in ac_list_content.split('\n') if line.strip()]
+            ac_items = []
+            for line in ac_lines:
+                clean_ac = re.sub(r"^(\d+\.|\*|-)\s*", "", line).strip()
+                if clean_ac:
+                    ac_items.append(clean_ac)
 
+            test_description_adf = {
+                "version": 1,
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "heading",
+                        "attrs": {"level": 2},
+                        "content": [
+                            {"type": "text", "text": "User Story"}
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {"type": "text", "text": user_story_narrative}
+                        ]
+                    },
+                    {
+                        "type": "heading",
+                        "attrs": {"level": 2},
+                        "content": [
+                            {"type": "text", "text": "Acceptance Criteria"}
+                        ]
+                    }
+                ]
+            }
+
+            if ac_items:
+                list_items = []
+                for item in ac_items:
+                    list_items.append({
+                        "type": "listItem",
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [
+                                    {"type": "text", "text": item}
+                                ]
+                            }
+                        ]
+                    })
+                test_description_adf["content"].append({
+                    "type": "orderedList",
+                    "attrs": {"order": 1},
+                    "content": list_items
+                })
+            else:
+                test_description_adf["content"].append({
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Verify functionality is working as described in the story."}
+                    ]
+                })
+
+            test_description_json = json.dumps(test_description_adf)
+ 
             # 3. Create Manual Test ticket in Jira containing the edge cases
             manual_summary = f"Manual Test: {summary}"
             if len(manual_summary) > 250:
                 manual_summary = manual_summary[:245] + "..."
             
+            await asyncio.sleep(2.0)  # Rate limit pacing delay
             create_manual_resp = await agent.chat(
-                f"Create a new issue in the project with summary: '{manual_summary}', "
-                f"description: '{test_description}', labels: ['manual'], and issue_type: 'Test' using the create_issue tool."
+                f"Create a new issue in the project using the create_issue tool. Summary: '{manual_summary}'. "
+                f"For the description parameter, pass the exact JSON structure: {test_description_json}. "
+                f"Set labels to ['manual'] and issue_type to 'Test'."
             )
             create_manual_text = await create_manual_resp.text()
             
@@ -415,21 +487,24 @@ class QAOrchestrator:
                     manual_test_key = keys_manual[0]
                 else:
                     raise RuntimeError(f"Could not extract created manual test key from response: {create_manual_text}")
-
+ 
+            await asyncio.sleep(2.0)  # Rate limit pacing delay
             # Link the manual test ticket to the story (inward: story, outward: test, so outward 'tests' inward story and inward is 'tested by' outward test)
             link_manual_resp = await agent.chat(
                 f"Link the issues using the link_issues tool: inward_key: '{ticket_id}', outward_key: '{manual_test_key}', link_type_name: 'Test'."
             )
             await link_manual_resp.text()
-
+ 
             # 4. Create Cucumber Test ticket in Jira containing Gherkin scenarios
             cucumber_summary = f"Cucumber Test: {summary}"
             if len(cucumber_summary) > 250:
                 cucumber_summary = cucumber_summary[:245] + "..."
                 
+            await asyncio.sleep(2.0)  # Rate limit pacing delay
             create_cuc_resp = await agent.chat(
-                f"Create a new issue in the project with summary: '{cucumber_summary}', "
-                f"description: '{test_description}', labels: ['cucumber'], and issue_type: 'Test' using the create_issue tool."
+                f"Create a new issue in the project using the create_issue tool. Summary: '{cucumber_summary}'. "
+                f"For the description parameter, pass the exact JSON structure: {test_description_json}. "
+                f"Set labels to ['cucumber'] and issue_type to 'Test'."
             )
             create_cuc_text = await create_cuc_resp.text()
             
@@ -444,7 +519,8 @@ class QAOrchestrator:
                     cucumber_test_key = keys_cuc[0]
                 else:
                     raise RuntimeError(f"Could not extract created cucumber test key from response: {create_cuc_text}")
-
+ 
+            await asyncio.sleep(2.0)  # Rate limit pacing delay
             # Link the cucumber test ticket to the story
             link_cuc_resp = await agent.chat(
                 f"Link the issues using the link_issues tool: inward_key: '{ticket_id}', outward_key: '{cucumber_test_key}', link_type_name: 'Test'."
@@ -483,13 +559,8 @@ class QAOrchestrator:
 
     async def create_story_with_skill(self, feature_name: str) -> str:
         """
-        Uses the registered create_jira_ticket tool/skill to validate, generate, and create a Jira Story.
-        Returns the output text of the tool execution.
+        Directly invokes the create_jira_ticket skill function, avoiding nested agent overhead.
         """
-        async with Agent(config=self.config) as agent:
-            response = await agent.chat(
-                f"Use the create_jira_ticket tool to validate and create a user story for the feature: '{feature_name}'"
-            )
-            return await response.text()
+        return await create_jira_ticket(feature_name)
 
 

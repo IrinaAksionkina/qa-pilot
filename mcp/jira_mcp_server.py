@@ -9,6 +9,8 @@ load_dotenv()
 # Initialize FastMCP Jira server
 mcp = FastMCP("Jira")
 
+from typing import Any, List
+
 # Retrieve Atlassian credentials
 SITE_URL = os.getenv("ATLASSIAN_SITE_URL")
 EMAIL = os.getenv("ATLASSIAN_USER_EMAIL")
@@ -36,7 +38,7 @@ def get_issue(issue_key: str) -> str:
     return f"Issue Key: {issue_key}\nSummary: {summary}\nDescription:\n{description}"
 
 @mcp.tool()
-def create_issue(summary: str, description: any, issue_type: str = "Story", labels: list[str] = None) -> str:
+def create_issue(summary: str, description: Any, issue_type: str = "Story", labels: List[str] = None) -> str:
     """
     Creates a new issue in the configured Jira project. Description can be a string or a structured ADF dictionary.
     Labels is an optional list of strings.
@@ -45,6 +47,16 @@ def create_issue(summary: str, description: any, issue_type: str = "Story", labe
     url = f"{SITE_URL.rstrip('/')}/rest/api/3/issue"
     
     # If description is a plain string, convert it to a valid ADF representation
+    if isinstance(description, str):
+        # Try to parse description as JSON in case a JSON string representation of ADF was passed
+        try:
+            import json
+            parsed = json.loads(description)
+            if isinstance(parsed, dict) and (parsed.get("type") == "doc" or "content" in parsed):
+                description = parsed
+        except Exception:
+            pass
+
     if isinstance(description, str):
         description = {
             "version": 1,

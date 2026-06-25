@@ -6,6 +6,7 @@ Role in Architecture: Orchestrated by QAOrchestrator to produce structured markd
 
 import os
 from google.antigravity import Agent, LocalAgentConfig
+from google.antigravity.hooks import policy
 from dotenv import load_dotenv
 
 # Load env variables
@@ -21,10 +22,17 @@ class EdgeCaseAgent:
         Initializes the EdgeCaseAgent with Gemini config and negative testing prompt instructions.
         """
         self.config = LocalAgentConfig(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
+            policies=[
+                policy.deny("create_file"),
+                policy.deny("edit_file"),
+                policy.deny("run_command"),
+                policy.allow("*")
+            ],
             system_instructions=(
                 "You are an expert QA Architect. Analyze the given Jira ticket details and generate edge case and negative "
-                "test scenarios in a structured Markdown table format with exactly three columns: | Test Case | Steps | Expected Result |."
+                "test scenarios in a structured Markdown table format with exactly three columns: | Test Case | Steps | Expected Result |. "
+                "Do NOT write any files or use any tools to edit files."
             )
         )
 
