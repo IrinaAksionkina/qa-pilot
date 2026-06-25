@@ -48,12 +48,20 @@ def create_issue(summary: str, description: Any, issue_type: str = "Story", labe
     
     # If description is a plain string, convert it to a valid ADF representation
     if isinstance(description, str):
-        # Try to parse description as JSON in case a JSON string representation of ADF was passed
+        import json
         try:
-            import json
-            parsed = json.loads(description)
-            if isinstance(parsed, dict) and (parsed.get("type") == "doc" or "content" in parsed):
-                description = parsed
+            temp = description.strip()
+            # Attempt to recursively decode double-serialized or whitespace-padded JSON strings
+            for _ in range(3):
+                parsed = json.loads(temp)
+                if isinstance(parsed, dict):
+                    if parsed.get("type") == "doc" or "content" in parsed:
+                        description = parsed
+                    break
+                elif isinstance(parsed, str):
+                    temp = parsed.strip()
+                else:
+                    break
         except Exception:
             pass
 
