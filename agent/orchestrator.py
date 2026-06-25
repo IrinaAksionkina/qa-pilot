@@ -243,39 +243,37 @@ class QAOrchestrator:
         if not is_valid_id:
             raise ValueError(f"Security Validation Failure: {err_id}")
 
-        async with Agent(config=self.config) as agent:
-            # 1. Fetch the ticket details using the get_issue MCP tool
-            response = await agent.chat(f"Fetch the Jira ticket details for {ticket_id} using the get_issue tool.")
-            ticket_details = await response.text()
+        # Fetch the ticket details directly via Jira REST API for precise data extraction
+        site_url = os.getenv("ATLASSIAN_SITE_URL", "https://irinasha.atlassian.net").rstrip("/")
+        email = os.getenv("ATLASSIAN_USER_EMAIL")
+        token = os.getenv("ATLASSIAN_API_TOKEN")
+        url = f"{site_url}/rest/api/3/issue/{ticket_id}"
+        resp = requests.get(url, auth=(email, token), headers={"Accept": "application/json"})
+        if resp.status_code != 200:
+            raise RuntimeError(f"Failed to fetch issue {ticket_id} from Jira REST API. Status: {resp.status_code}")
+        
+        issue_json = resp.json()
+        fields = issue_json.get("fields", {})
+        summary = fields.get("summary", "")
+        print(f"DEBUG summary extracted: {summary}")
+        
+        raw_desc = fields.get("description", "")
+        description_str = raw_desc
+        if isinstance(raw_desc, dict):
+            import json
+            description_str = json.dumps(raw_desc, indent=2)
             
-            # Extract summary/title for naming the test tickets
-            print(f"DEBUG ticket_details: {ticket_details[:500]}")
-            summary = None
-            patterns = [
-                r"Summary:\s*(.*)",
-                r"summary['\"]:\s*['\"]([^'\"]+)['\"]",
-                r"\"summary\":\s*\"([^\"]+)\"",
-                r"Title:\s*(.*)",
-            ]
-            for pattern in patterns:
-                match = re.search(pattern, ticket_details, re.IGNORECASE)
-                if match:
-                    summary = match.group(1).strip()
-                    summary = re.sub(r'\*+', '', summary).strip()
-                    break
+        ticket_details = f"Issue Key: {ticket_id}\nSummary: {summary}\nDescription:\n{description_str}"
+        print(f"DEBUG ticket_details: {ticket_details[:500]}")
 
-            if not summary:
-                summary = f"Feature {ticket_id}"
-            print(f"DEBUG summary extracted: {summary}")
+        # Security Guardrail Check 3: Validate schema structure of get_issue response content
+        desc_text = description_str if isinstance(description_str, str) else ""
+        mock_jira_resp = {"summary": summary, "description": desc_text}
+        is_valid_schema, err_schema = validate_jira_response(mock_jira_resp)
+        if not is_valid_schema:
+            raise ValueError(f"Security Validation Failure (Jira Data): {err_schema}")
 
-            # Security Guardrail Check 3: Validate schema structure of get_issue response content
-            desc_match = re.search(r"Description:\s*(.*)", ticket_details, re.DOTALL)
-            desc_text = desc_match.group(1).strip() if desc_match else ""
-            mock_jira_resp = {"summary": summary, "description": desc_text}
-            is_valid_schema, err_schema = validate_jira_response(mock_jira_resp)
-            if not is_valid_schema:
-                raise ValueError(f"Security Validation Failure (Jira Data): {err_schema}")
-
+        async with Agent(config=self.config) as agent:
             # 2. Call sub-agents to generate BDD scenarios and edge cases
             await asyncio.sleep(2.0)  # Rate limit pacing delay
             bdd_scenarios = await self.bdd_agent.generate_bdd(ticket_details)
@@ -290,56 +288,49 @@ class QAOrchestrator:
             ac_list_content = ""
             
             try:
-                # Retrieve raw Jira issue description fields directly from Jira API for precise ADF parsing
-                site_url = os.getenv("ATLASSIAN_SITE_URL", "https://irinasha.atlassian.net").rstrip("/")
-                email = os.getenv("ATLASSIAN_USER_EMAIL")
-                token = os.getenv("ATLASSIAN_API_TOKEN")
-                url = f"{site_url}/rest/api/3/issue/{ticket_id}"
-                resp = requests.get(url, auth=(email, token), headers={"Accept": "application/json"})
-                if resp.status_code == 200:
-                    raw_desc = resp.json().get("fields", {}).get("description")
-                    if raw_desc and isinstance(raw_desc, dict) and raw_desc.get("type") == "doc":
-                        content_nodes = raw_desc.get("content", [])
+                # Reuse raw Jira issue description fields already fetched
+                if raw_desc and isinstance(raw_desc, dict) and raw_desc.get("type") == "doc":
+                    content_nodes = raw_desc.get("content", [])
+                    
+                    # Loop through nodes to parse sections
+                    current_section = None
+                    for node in content_nodes:
+                        node_type = node.get("type")
                         
-                        # Loop through nodes to parse sections
-                        current_section = None
-                        for node in content_nodes:
-                            node_type = node.get("type")
-                            
-                            # Identify section headers
-                            if node_type == "heading":
-                                heading_text = "".join([t.get("text", "") for t in node.get("content", []) if t.get("type") == "text"]).strip().lower()
-                                if "story description" in heading_text or "description" in heading_text:
-                                    current_section = "story"
-                                elif "acceptance criteria" in heading_text:
-                                    current_section = "ac"
-                                else:
-                                    current_section = None
-                            
-                            # Parse content inside target sections
-                            elif node_type == "paragraph" and current_section == "story":
-                                text_val = "".join([t.get("text", "") for t in node.get("content", []) if t.get("type") == "text"]).strip()
-                                if text_val:
-                                    user_story_narrative = text_val
-                                    
-                            elif node_type == "orderedList" and current_section == "ac":
-                                ac_items = []
-                                idx = 1
-                                for list_item in node.get("content", []):
-                                    item_texts = []
-                                    for paragraph in list_item.get("content", []):
-                                        for text_node in paragraph.get("content", []):
-                                            if text_node.get("type") == "text":
-                                                text_txt = text_node.get("text", "").strip()
-                                                if text_txt:
-                                                    item_texts.append(text_txt)
-                                    if item_texts:
-                                        # Combine all text blocks under this list item, replace linebreaks with spaces for a single line view
-                                        combined_text = " ".join(item_texts).replace("\n", " ").strip()
-                                        ac_items.append(f"{idx}. {combined_text}")
-                                        idx += 1
-                                if ac_items:
-                                    ac_list_content = "\n".join(ac_items)
+                        # Identify section headers
+                        if node_type == "heading":
+                            heading_text = "".join([t.get("text", "") for t in node.get("content", []) if t.get("type") == "text"]).strip().lower()
+                            if "story description" in heading_text or "description" in heading_text:
+                                current_section = "story"
+                            elif "acceptance criteria" in heading_text:
+                                current_section = "ac"
+                            else:
+                                current_section = None
+                        
+                        # Parse content inside target sections
+                        elif node_type == "paragraph" and current_section == "story":
+                            text_val = "".join([t.get("text", "") for t in node.get("content", []) if t.get("type") == "text"]).strip()
+                            if text_val:
+                                user_story_narrative = text_val
+                                
+                        elif node_type == "orderedList" and current_section == "ac":
+                            ac_items = []
+                            idx = 1
+                            for list_item in node.get("content", []):
+                                item_texts = []
+                                for paragraph in list_item.get("content", []):
+                                    for text_node in paragraph.get("content", []):
+                                        if text_node.get("type") == "text":
+                                            text_txt = text_node.get("text", "").strip()
+                                            if text_txt:
+                                                item_texts.append(text_txt)
+                                if item_texts:
+                                    # Combine all text blocks under this list item, replace linebreaks with spaces for a single line view
+                                    combined_text = " ".join(item_texts).replace("\n", " ").strip()
+                                    ac_items.append(f"{idx}. {combined_text}")
+                                    idx += 1
+                            if ac_items:
+                                ac_list_content = "\n".join(ac_items)
             except Exception as parse_err:
                 print(f"ADF description parsing failed fallback: {parse_err}")
  
