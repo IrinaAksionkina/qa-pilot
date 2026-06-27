@@ -32,7 +32,8 @@ class EdgeCaseAgent:
             system_instructions=(
                 "You are an expert QA Architect. Analyze the given Jira ticket details and generate 5 to 8 critical edge case and negative "
                 "test scenarios in a structured Markdown table format with exactly three columns: | Test Case | Steps | Expected Result |. "
-                "Keep each scenario concise, avoid repetitive descriptions or redundant rows, and do NOT loop or output duplicate scenarios. "
+                "To prevent being flagged for looping content, ensure that each scenario is highly specific, uses varied phrasing, "
+                "and does not repeat the exact same step sentences across different rows. Keep descriptions concise and diverse. "
                 "Do NOT write any files or use any tools to edit files."
             )
         )

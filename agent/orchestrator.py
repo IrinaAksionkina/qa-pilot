@@ -195,17 +195,17 @@ class QAOrchestrator:
             # Columns usually are: Test Case | Steps | Expected Result
             if len(parts) >= 3:
                 raw_steps = parts[1]
-                # Split on <br> tags into individual steps
-                individual_steps = re.split(r'<br\s*/?>', raw_steps)
-                for s in individual_steps:
-                    # Remove numbered prefixes and clean up
-                    s = re.sub(r'^\d+\.\s*', '', s.strip())
-                    s = re.sub(r'<[^>]+>', '', s).strip()
-                    if s:
-                        steps.append({
-                            "action": f"{parts[0]} - {s}",
-                            "result": parts[2]
-                        })
+                # Replace <br> tags with newlines
+                steps_cleaned = re.sub(r'<br\s*/?>', '\n', raw_steps)
+                # Remove any other HTML tags
+                steps_cleaned = re.sub(r'<[^>]+>', '', steps_cleaned).strip()
+                
+                action = f"{parts[0]}\n{steps_cleaned}"
+                result = parts[2]
+                steps.append({
+                    "action": action,
+                    "result": result
+                })
                 continue
             elif len(parts) == 2:
                 action = parts[0]
@@ -220,7 +220,7 @@ class QAOrchestrator:
             })
         print(f"DEBUG parsed steps output: {steps}")
         return steps
-
+ 
     def _update_xray_manual_test(self, token: str, issue_id: str, steps: list):
         """
         Sets a Test issue type to Manual and populates its manual steps using the Xray GraphQL API.
@@ -236,12 +236,12 @@ class QAOrchestrator:
         except Exception:
             # Fallback if removeAllTestSteps is not supported or fails
             pass
-
+ 
         # 3. Add each step one by one
         for step in steps:
-            # Clean step contents of quotes to avoid GraphQL syntax errors
-            action_escaped = step["action"].replace('"', '\\"')
-            result_escaped = step["result"].replace('"', '\\"')
+            # Clean step contents of quotes and newlines to avoid GraphQL syntax errors
+            action_escaped = step["action"].replace('"', '\\"').replace('\n', '\\n')
+            result_escaped = step["result"].replace('"', '\\"').replace('\n', '\\n')
             step_mutation = f'mutation {{ addTestStep(issueId: "{issue_id}", step: {{ action: "{action_escaped}", result: "{result_escaped}" }}) {{ id }} }}'
             self._execute_xray_graphql(token, step_mutation)
 
