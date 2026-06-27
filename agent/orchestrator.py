@@ -21,6 +21,30 @@ from agent.guardrails import validate_ticket_id, validate_jira_response, sanitiz
 # Load env variables
 load_dotenv()
 
+def _adf_to_plain_text(adf_data) -> str:
+    """Helper to convert Atlassian Document Format (ADF) dict to clean plain text."""
+    if not adf_data:
+        return ""
+    if isinstance(adf_data, str):
+        return adf_data
+    if not isinstance(adf_data, dict):
+        return str(adf_data)
+        
+    text_parts = []
+    def traverse(node):
+        if not isinstance(node, dict):
+            return
+        node_type = node.get("type")
+        if node_type == "text":
+            text_parts.append(node.get("text", ""))
+        elif "content" in node:
+            for child in node["content"]:
+                traverse(child)
+            if node_type in ["paragraph", "heading", "listItem"]:
+                text_parts.append("\n")
+    traverse(adf_data)
+    return "".join(text_parts).strip()
+
 class QAOrchestrator:
     """
     An ADK orchestrator agent that fetches a Jira ticket, generates BDD and Edge Case test plans
@@ -150,6 +174,7 @@ class QAOrchestrator:
         Returns:
             list: List of parsed test steps dictionaries (keys: action, result).
         """
+        print(f"DEBUG markdown_table input:\n{markdown_table[:1000]}")
         steps = []
         lines = markdown_table.strip().split("\n")
         for line in lines:
@@ -193,6 +218,7 @@ class QAOrchestrator:
                 "action": action,
                 "result": result
             })
+        print(f"DEBUG parsed steps output: {steps}")
         return steps
 
     def _update_xray_manual_test(self, token: str, issue_id: str, steps: list):
@@ -258,16 +284,12 @@ class QAOrchestrator:
         print(f"DEBUG summary extracted: {summary}")
         
         raw_desc = fields.get("description", "")
-        description_str = raw_desc
-        if isinstance(raw_desc, dict):
-            import json
-            description_str = json.dumps(raw_desc, indent=2)
-            
-        ticket_details = f"Issue Key: {ticket_id}\nSummary: {summary}\nDescription:\n{description_str}"
+        description_plain_text = _adf_to_plain_text(raw_desc)
+        ticket_details = f"Issue Key: {ticket_id}\nSummary: {summary}\nDescription:\n{description_plain_text}"
         print(f"DEBUG ticket_details: {ticket_details[:500]}")
 
         # Security Guardrail Check 3: Validate schema structure of get_issue response content
-        desc_text = description_str if isinstance(description_str, str) else ""
+        desc_text = description_plain_text
         mock_jira_resp = {"summary": summary, "description": desc_text}
         is_valid_schema, err_schema = validate_jira_response(mock_jira_resp)
         if not is_valid_schema:
@@ -282,8 +304,6 @@ class QAOrchestrator:
             edge_cases = await self.edge_case_agent.generate_edge_cases(ticket_details)
             
             # Clean User Story narrative and Acceptance Criteria lists parsed from description field
-            # ...
-            # [Lines 249 to 387 unchanged, showing context below]
             user_story_narrative = ""
             ac_list_content = ""
             
