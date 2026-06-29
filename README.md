@@ -122,10 +122,6 @@ qa-pilot/
 │       └── create_jira_ticket.py # Story creation skill
 ├── mcp/
 │   └── jira_mcp_server.py     # Atlassian MCP tool endpoints
-├── tests/
-│   └── sample_tickets/
-│       └── sample_ticket.json # Offline test mockups
-└── reports/                   # Saved QA analysis files
 ```
 
 ## Demo
@@ -135,4 +131,4 @@ qa-pilot/
 Agents for Business
 
 ## Author
-Irina Aksionkina
+Irina
