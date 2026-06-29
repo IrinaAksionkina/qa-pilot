@@ -125,7 +125,7 @@ qa-pilot/
 ```
 
 ## Demo
-[YouTube demo link coming soon]
+[YouTube Demo Video](https://youtu.be/aEojqiDG8LQ)
 
 ## Track
 Agents for Business
